@@ -1,0 +1,274 @@
+#!/bin/bash
+
+TITLE_MENU="Центр Управления Светодиодом"
+SERVER_PIPE_IN=/tmp/LedServer_in
+SERVER_PIPE_OUT=/tmp/LedServer_out
+
+A_COLOR_LED=("red" "green" "blue")
+A_RATE_LED=("0" "1" "2" "3" "4" "5")
+A_STATE_LED=("off" "on")
+
+STATUS_FAILED="FAILED"
+STATUS_OK="OK"
+
+ledColor="" #${A_COLOR_LED[0]}
+ledState="" #${A_STATE_LED[0]}
+ledRate=""  #${A_RATE_LED[0]}
+
+statusString=""
+keypress=0
+ansverServer1=""
+ansverServer2=""
+
+# функция проверки сервера
+function Testserver 
+{
+    if [ -p $SERVER_PIPE_IN ]
+    then
+	statusString=""
+	return 0
+    else
+	statusString="сервер не запущен"
+	ledState=$STATUS_FAILED
+	ledColor=$STATUS_FAILED
+	ledRate=$STATUS_FAILED
+    return 1
+fi
+}
+
+
+function ExchangeServer
+{
+    ansverServer1=""
+    ansverServer2=""
+    if [ $# -eq 0 ] || [ $# -gt 2 ]
+    then
+	statusString="Ошибка"
+      	return 1
+    elif [ $# -eq 1 ]
+    then
+	echo "$1" > $SERVER_PIPE_IN
+    else
+	echo "$1 $2" > $SERVER_PIPE_IN
+    fi
+    #OIFS=$IFS; IFS=" "
+    read ansverServer1 ansverServer2 < $SERVER_PIPE_OUT
+    #echo "$ansverServer1 $ansverServer2"
+    #read
+    #IFS=$OIFS
+    return 0
+}
+
+
+function ComGetLedState
+{
+    ExchangeServer "get-led-state"
+    if [[ $? -eq 0 ]]
+    then
+	statusString=$ansverServer1
+	ledState=$ansverServer2
+    fi
+}
+
+function ComSetLedState
+{
+    if [ $# -eq 0 ] || [ $# -gt 1 ]
+    then
+	statusString="Ошибка"
+      	return 1
+    else
+      ExchangeServer "set-led-state" $1
+    fi
+    
+    if [[ $? -eq 0 ]]
+    then
+	statusString=$ansverServer1
+	if [[ $ansverServer1=$STATUS_OK ]]
+	then
+	    ledState=$1
+	else
+	    ledState=$STATUS_FAILED
+	fi
+    fi
+}
+
+function ComGetLedColor
+{
+    ExchangeServer "get-led-color"
+    if [[ $? -eq 0 ]]
+    then
+	statusString=$ansverServer1
+	ledColor=$ansverServer2
+    fi
+}
+
+function ComGetLedRate
+{
+    ExchangeServer "get-led-rate"
+    if [[ $? -eq 0 ]]
+    then
+	statusString=$ansverServer1
+	ledRate=$ansverServer2
+    fi
+}
+
+function UpdateData
+{
+    ComGetLedState
+    ComGetLedColor
+    ComGetLedRate
+    
+}
+
+
+function LedOnOff
+{
+    ComGetLedState
+    if [[ $ledState = ${A_STATE_LED[0]} ]]
+    then
+	ComSetLedState "on"
+    else
+	ComSetLedState "off"
+    fi
+      
+}
+
+
+#************************#
+# SetParam               #
+# Функция меню настроек  #
+#************************#
+function SetParam 
+{
+    local i=1
+    local color=$ledColor
+    local rate=$ledRate
+    local varstr=""
+    
+    clear
+    echo "$TITLE_MENU"
+    echo 
+    echo "Настроика параметров"
+    echo 
+    echo "Задайте Цвет (текущий - $color):"
+    echo 
+
+    for var in ${A_COLOR_LED[*]}
+    do
+      echo "$i. $var"
+      i=$(($i+1))
+    done
+    
+    read -s -n1 -p "цвет: " keypress
+    if [[ $keypress -gt 0 ]] && [[ $keypress -le ${#A_COLOR_LED[*]} ]]
+    then
+	color=${A_COLOR_LED[$(($keypress-1))]}
+    fi
+    echo "$color"
+    
+    
+    i=1
+    echo 
+    echo "Задайте Частоту (текущая - $rate):"
+    echo 
+
+    for var in ${A_RATE_LED[*]}
+    do
+      echo "$i. $var Гц"
+      i=$(($i+1))
+    done
+    
+    read -s -n1 -p "частота: " keypress
+    if [[ $keypress -gt 0 ]] && [[ $keypress -le ${#A_RATE_LED[*]} ]]
+    then
+	rate=${A_RATE_LED[$(($keypress-1))]}
+    fi
+    echo "$rate Гц"
+
+    echo 
+    echo "Выбраны значения: цвет - $color, частота - $rate Гц"
+    read -s -n1 -p "Применить? д/н(y/n): " keypress
+    if [[ $keypress = "y" ]] || [[ $keypress = "Y" ]] || [[ $keypress = "д" ]] || [[ $keypress = "Д" ]]
+    then
+	varstr=
+	SendServer
+    fi
+    
+    
+
+}
+
+
+
+
+#************************#
+# Menu                   #
+# Функция основного меню #
+#************************#
+function Menu 
+{
+    clear
+    echo "$TITLE_MENU"
+    echo 
+    echo "Информация о Светодиоде:"
+    echo -e "Состояние\tЦвет\tЧастота"
+    echo -e "$ledState\t\t$ledColor\t$ledRate"
+    echo 
+    echo "1. Обновить информацию."
+    echo "2. Включить / Выключить."
+    echo "3. Задать Цвет."
+    echo "4. Задать Частоту."
+    echo "5. Выход."
+    echo 
+    echo "Результат последней команды: $statusString"
+    echo 
+    read -p "введите команду: " keypress
+    
+    statusString="$keypress"
+
+    Testserver 
+    if [[ $? -ne 0 ]]
+    then
+	return
+    fi
+
+    
+    case "$keypress" in
+    1)
+	UpdateData
+	;;
+    2) 	
+	LedOnOff 
+	;;
+    3) 
+	;;
+    4)
+	SetParam
+	;;
+    5)  
+	echo "Работа завершена."
+	break 
+	;;
+    *) 
+	statusString="неверная команда"
+	;;
+    esac
+}
+
+
+#*************************#
+# основной цикл программы #
+#*************************#
+
+Testserver
+if [[ $? -eq 0 ]]
+then
+    UpdateData
+fi
+
+while :
+do
+    Menu
+done
+
+exit 0

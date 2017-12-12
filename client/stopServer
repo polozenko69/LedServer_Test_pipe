@@ -1,0 +1,4 @@
+#!/bin/bash
+
+PID=$(pidof LedServer)
+kill -SIGINT $PID
