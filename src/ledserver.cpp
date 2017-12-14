@@ -1,6 +1,8 @@
 #include "ledserver.h"
 
-volatile int stop=0;
+
+// обработка сигнала INT системы
+volatile int stopServerFlag=0;
 
 struct sigaction sa;
 
@@ -8,14 +10,15 @@ struct sigaction sa;
 void int_handler(int i)
 {
     printf("Ctrl-C\n");
-    stop=1;
+    stopServerFlag=1;
 }
-
+// ----------------------------
 
 
 cLedServer::cLedServer()
 {
-    stop=0;
+    // установим обработчик сигнала INT и заблокируем HUP
+    stopServerFlag=0;
     sigset_t newset;
     sigemptyset(&newset);
     sigaddset(&newset, SIGHUP);
@@ -23,68 +26,78 @@ cLedServer::cLedServer()
     sa.sa_handler = int_handler;
     sigaction(SIGINT, &sa, 0);
 
-    fd_in=0;
-    fd_out=0;
-
+    // создадим объект светодиода
     led = new cLed();
+    errinit=GEN_ERROR;
 }
 
 eLS_Error cLedServer::Init(void)
 {
-    eLS_Error err=NO_ERROR;
-
+    // создадим входной канал
     if ( mkfifo(NAMEDPIPE_IN, 0666) == -1 )
     {
         if(errno==EEXIST)
-            err=PIPE_EXIST;
+            errinit=PIPE_EXIST;
         else
-            err=PIPE_ERROR;
+            errinit=PIPE_ERROR;
+    //если нет ошибок создаем выходной канал
     } else if ( mkfifo(NAMEDPIPE_OUT, 0666) == -1 )
     {
         if(errno==EEXIST)
-            err=PIPE_EXIST;
+            errinit=PIPE_EXIST;
         else
-            err=PIPE_ERROR;
-    } else if( led->Init() )
+            errinit=PIPE_ERROR;
+    //если нет ошибок инициализируем аппаратуру светодиода
+    } else if( led->Init()==-1 )
     {
-        err=HW_ERROR;
+        errinit=HW_ERROR;
     } else
-        err=NO_ERROR;
+        errinit=NO_ERROR;
 
-    return err;
+    return errinit;
 }
 
 void cLedServer::Run()
 {
-    char buf[BUFSIZE];
-    char bufout[BUFSIZE];
+    // входной/выходной буфер обмена
+    char buf[MAX_LENGHT_COMMAND];
+
+    int fd=0;
+
     int len=0;
-    int ret=0;
+
+    if(errinit!=NO_ERROR)
+         return;
+
+    //основной цикл обработки сообщений
     while(1)
     {
-        if ( (fd_in = open(NAMEDPIPE_IN, O_RDONLY)) > 0 )
+        // ожидаем открытия входного канала клиентом
+        if ( (fd = open(NAMEDPIPE_IN, O_RDONLY)) > 0 )
         {
-            memset(buf, '\0', BUFSIZE);
-            memset(bufout, '\0', BUFSIZE);
+            memset(buf, '\0', MAX_LENGHT_COMMAND);
 
-            len = read(fd_in, buf, BUFSIZE-1);
-            close(fd_in);
+
+            len = read(fd, buf, MAX_LENGHT_COMMAND-1);
+            close(fd);
 
             if (len > 0 )
             {
 
                 printf("Команда: %s", buf);
-                ret=ProcessCom(buf, bufout);
-                if(ret==0)
+                // передаем принятые данные на обработку
+                ProcessCom(buf);
+                // по завершению в buf выходные данные
+
+                // ожидаем открытия клиентом на чтение выходношо канала
+                if ( (fd = open(NAMEDPIPE_OUT, O_WRONLY)) > 0 )
                 {
-                    strcpy(bufout, RET_FAILED);
-                    strcat(bufout, "\n");
-                }
-                if ( (fd_out = open(NAMEDPIPE_OUT, O_WRONLY)) > 0 )
-                {
-                    len=write(fd_out, bufout, strlen(bufout));
-                    close(fd_out);
-                    if(len>0) printf("Ответ: %s\n", bufout);
+                    // отправляем результат
+                    len=write(fd, buf, strlen(buf));
+                    close(fd);
+                    if(len>0) printf("Ответ: %s\n", buf);
+
+         // в случае ошибок, сообщаем
                     else perror("write");
                 } else
                 {
@@ -101,13 +114,17 @@ void cLedServer::Run()
             perror("open in_pipe");
         }
 
-        if(stop==1) return;
+        if(stopServerFlag==1)
+            // если получен сигнал на завершение работы, выходим
+            break;
     }
 }
 
 void cLedServer::Done()
 {
+    // завершаем работу с аппаратной частью
     led->Done();
+    // удалим каналы
     unlink(NAMEDPIPE_IN);
     unlink(NAMEDPIPE_OUT);
 }
@@ -117,24 +134,25 @@ cLedServer::~cLedServer()
     delete led;
 }
 
-int cLedServer::ProcessCom(char *com, char *out)
+void cLedServer::ProcessCom(char *com)
 {
+    char tmpstr[MAX_LENGHT_COMMAND];
     char *device=NULL;
-    char *command=NULL;
-    char *parametre=NULL;
-    char *value=NULL;
 
-    command=strtok(com, "- \n");
-    device=strtok(NULL, "- \n");
-    parametre=strtok(NULL, "- \n");
-    value=strtok(NULL, "- \n");
+    strcpy(tmpstr, com); // скопируем входную команду
 
+
+    // вычислим название устройства оно у нас 1 после тире
+    device=strtok(tmpstr, "-"); // холостой ход
+    device=strtok(NULL, "-");
+
+    // проверим для какого устройства
+    // (вдруг захочется добавить еще устроиств - led2 или motor)
+    // если устроиства нет - ошибка
     if(strcmp("led", device)==0)
-        led->InCommand(command, parametre, value, out);
-
-
-    return strlen(out);
-
+        // передаем на обработку аппаратуре
+        led->InCommand(com);
+    else strcpy(com, RETURN_FAILED);
 }
 
 

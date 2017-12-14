@@ -1,7 +1,7 @@
 
 SRCDIR = ./src
 OBJDIR = ./bin
-INSTALLDIR = 
+INSTALLDIR =./ 
 
 CPP = g++
 
@@ -24,6 +24,7 @@ LedServer: main.o ledserver.o cled.o
 	$(CPP) -o $(OBJDIR)/LedServer $(OBJDIR)/main.o $(OBJDIR)/ledserver.o $(OBJDIR)/cled.o
 	
 
+# это пока прописывать не будем	
 install:  
 
 uninstall:
