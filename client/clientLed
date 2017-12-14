@@ -4,8 +4,8 @@ TITLE_MENU="Центр Управления Светодиодом"
 SERVER_PIPE_IN=/tmp/LedServer_in
 SERVER_PIPE_OUT=/tmp/LedServer_out
 
-A_COLOR_LED=("red" "green" "blue")
-A_RATE_LED=("0" "1" "2" "3" "4" "5")
+A_COLOR_LED=("red" "green" "yellow" "blue" )
+A_RATE_LED=("0" "1" "2" "3" "4" "5" "6")
 A_STATE_LED=("off" "on")
 
 STATUS_FAILED="FAILED"
@@ -51,14 +51,12 @@ function ExchangeServer
     else
 	echo "$1 $2" > $SERVER_PIPE_IN
     fi
-    #OIFS=$IFS; IFS=" "
+    
     read ansverServer1 ansverServer2 < $SERVER_PIPE_OUT
-    #echo "$ansverServer1 $ansverServer2"
-    #read
-    #IFS=$OIFS
     return 0
 }
 
+# -----------------------------
 
 function ComGetLedState
 {
@@ -83,15 +81,14 @@ function ComSetLedState
     if [[ $? -eq 0 ]]
     then
 	statusString=$ansverServer1
-	if [[ $ansverServer1=$STATUS_OK ]]
+	if [[ $statusString = $STATUS_OK ]]
 	then
 	    ledState=$1
-	else
-	    ledState=$STATUS_FAILED
 	fi
     fi
 }
 
+# --------------------------------------
 function ComGetLedColor
 {
     ExchangeServer "get-led-color"
@@ -101,6 +98,28 @@ function ComGetLedColor
 	ledColor=$ansverServer2
     fi
 }
+
+function ComSetLedColor
+{
+    if [ $# -eq 0 ] || [ $# -gt 1 ]
+    then
+	statusString="Ошибка"
+      	return 1
+    else
+      ExchangeServer "set-led-color" $1
+    fi
+    
+    if [[ $? -eq 0 ]]
+    then
+	statusString=$ansverServer1
+	if [[ $statusString = $STATUS_OK ]]
+	then
+	    ledColor=$1
+	fi
+    fi
+}
+
+#----------------------------------------
 
 function ComGetLedRate
 {
@@ -112,6 +131,27 @@ function ComGetLedRate
     fi
 }
 
+function ComSetLedRate
+{
+    if [ $# -eq 0 ] || [ $# -gt 1 ]
+    then
+	statusString="Ошибка"
+      	return 1
+    else
+      ExchangeServer "set-led-rate" $1
+    fi
+    
+    if [[ $? -eq 0 ]]
+    then
+	statusString=$ansverServer1
+	if [[ $statusString = $STATUS_OK ]]
+	then
+	    ledRate=$1
+	fi
+    fi
+}
+
+# -----------------------------------
 function UpdateData
 {
     ComGetLedState
@@ -123,7 +163,7 @@ function UpdateData
 
 function LedOnOff
 {
-    ComGetLedState
+    #ComGetLedState
     if [[ $ledState = ${A_STATE_LED[0]} ]]
     then
 	ComSetLedState "on"
@@ -134,21 +174,16 @@ function LedOnOff
 }
 
 
-#************************#
-# SetParam               #
-# Функция меню настроек  #
-#************************#
-function SetParam 
+function LedColor
 {
+    ComGetLedColor
+    
     local i=1
     local color=$ledColor
-    local rate=$ledRate
     local varstr=""
     
     clear
     echo "$TITLE_MENU"
-    echo 
-    echo "Настроика параметров"
     echo 
     echo "Задайте Цвет (текущий - $color):"
     echo 
@@ -158,46 +193,69 @@ function SetParam
       echo "$i. $var"
       i=$(($i+1))
     done
+    echo "$i. Отмена"
+    echo
+    echo
     
-    read -s -n1 -p "цвет: " keypress
-    if [[ $keypress -gt 0 ]] && [[ $keypress -le ${#A_COLOR_LED[*]} ]]
-    then
-	color=${A_COLOR_LED[$(($keypress-1))]}
-    fi
-    echo "$color"
-    
-    
-    i=1
-    echo 
-    echo "Задайте Частоту (текущая - $rate):"
-    echo 
-
-    for var in ${A_RATE_LED[*]}
+    while :
     do
-      echo "$i. $var Гц"
-      i=$(($i+1))
+      read -s -n1 -p "цвет: $varstr" keypress
+      if [[ $keypress -gt 0 ]] && [[ $keypress -le ${#A_COLOR_LED[*]} ]]
+      then
+	color=${A_COLOR_LED[$(($keypress-1))]}
+	ComSetLedColor $color
+	break
+      elif [[ $keypress -eq $i ]]
+      then
+	break
+      else
+	echo "неверно"
+      fi
     done
     
-    read -s -n1 -p "частота: " keypress
-    if [[ $keypress -gt 0 ]] && [[ $keypress -le ${#A_RATE_LED[*]} ]]
-    then
-	rate=${A_RATE_LED[$(($keypress-1))]}
-    fi
-    echo "$rate Гц"
-
-    echo 
-    echo "Выбраны значения: цвет - $color, частота - $rate Гц"
-    read -s -n1 -p "Применить? д/н(y/n): " keypress
-    if [[ $keypress = "y" ]] || [[ $keypress = "Y" ]] || [[ $keypress = "д" ]] || [[ $keypress = "Д" ]]
-    then
-	varstr=
-	SendServer
-    fi
-    
-    
-
 }
 
+
+function LedRate
+{
+    ComGetLedRate
+    
+    local i=0
+    local rate=$ledRate
+    local varstr=""
+    
+    clear
+    echo "$TITLE_MENU"
+    echo 
+    echo "Задайте Частоту мерцания (текущая - $rate):"
+    echo 
+
+    for i in ${A_RATE_LED[*]}
+    do
+      echo "$i Гц"
+      #i=$(($i+1))
+    done
+    echo "$(($i+1)) Отмена"
+    echo
+    echo
+    
+    while :
+    do
+      read -s -n1 -p "частота: $varstr" keypress
+      if [[ $keypress -ge 0 ]] && [[ $keypress -le ${#A_RATE_LED[*]} ]]
+      then
+	rate=${A_RATE_LED[$(($keypress))]}
+	ComSetLedRate $rate
+	break
+      elif [[ $keypress -eq $i ]]
+      then
+	break
+      else
+	echo "неверно"
+      fi
+    done
+    
+}
 
 
 
@@ -227,7 +285,7 @@ function Menu
     statusString="$keypress"
 
     Testserver 
-    if [[ $? -ne 0 ]]
+    if [[ $? -ne 0 ]] && [[ keypress -ne 5 ]]
     then
 	return
     fi
@@ -240,10 +298,11 @@ function Menu
     2) 	
 	LedOnOff 
 	;;
-    3) 
+    3)
+	LedColor
 	;;
     4)
-	SetParam
+	LedRate
 	;;
     5)  
 	echo "Работа завершена."
@@ -260,9 +319,11 @@ function Menu
 # основной цикл программы #
 #*************************#
 
+# проверим наличие сервера
 Testserver
 if [[ $? -eq 0 ]]
 then
+# обновим данные
     UpdateData
 fi
 
