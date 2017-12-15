@@ -1,6 +1,9 @@
 
+# Makefile сборки сервера
+
 SRCDIR = ./src
 OBJDIR = ./bin
+CLIENTDIR = ./client
 INSTALLDIR =./ 
 
 CPP = g++
@@ -24,9 +27,10 @@ LedServer: main.o ledserver.o cled.o
 	$(CPP) -o $(OBJDIR)/LedServer $(OBJDIR)/main.o $(OBJDIR)/ledserver.o $(OBJDIR)/cled.o
 	
 
-# это пока прописывать не будем	
-install:  
+install: 
+	install $(OBJDIR)/LedServer $(CLIENTDIR)/clientLed $(CLIENTDIR)/serverLed /usr/local/bin
 
 uninstall:
+	rm -f /usr/local/bin/LedServer /usr/local/bin/clientLed /usr/local/bin/serverLed
 
 

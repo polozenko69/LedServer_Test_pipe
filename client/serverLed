@@ -1,0 +1,74 @@
+#!/bin/bash
+
+# каналы сервера
+SERVER_PIPE_IN=/tmp/LedServer_in
+SERVER_PIPE_OUT=/tmp/LedServer_out
+
+
+PID=$(pidof LedServer)
+
+function statusproc
+{
+  if [[ -n $PID ]]
+  then
+    echo "LedServer: запущен. PID=$PID"
+  else
+    echo "LedServer: остановлен."
+  fi
+}
+
+
+
+function start_it_up
+{
+  if [[ -z $PID ]]
+  then
+    LedServer >/dev/null&
+  fi
+  sleep 1
+  PID=$(pidof LedServer)
+  statusproc
+  
+}
+
+function shut_it_down
+{
+  if [[ -n $PID ]]
+  then
+    kill -SIGINT $PID
+  fi
+  
+  if [ -p $SERVER_PIPE_IN ]
+  then
+    rm -f $SERVER_PIPE_IN
+  fi
+
+  if [ -p $SERVER_PIPE_OUT ]
+  then
+    rm -f $SERVER_PIPE_OUT
+  fi
+  echo "LedServer: остановлен."
+}
+
+
+
+case "$1" in
+  start)
+    start_it_up
+    ;;
+  stop)
+    shut_it_down
+    ;;
+  restart)
+    shut_it_down
+    start_it_up
+    ;;
+  status)
+    statusproc
+    ;;
+  *)
+    echo "Usage: serverLed {start|stop|restart|status}"
+  ;;
+esac
+
+exit 0

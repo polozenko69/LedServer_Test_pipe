@@ -1,16 +1,22 @@
 #!/bin/bash
 
+# заголовок 
 TITLE_MENU="Центр Управления Светодиодом"
+
+# каналы сервера
 SERVER_PIPE_IN=/tmp/LedServer_in
 SERVER_PIPE_OUT=/tmp/LedServer_out
 
+# свойства светодиода
 A_COLOR_LED=("red" "green" "yellow" "blue" )
 A_RATE_LED=("0" "1" "2" "3" "4" "5" "6")
 A_STATE_LED=("off" "on")
 
+
 STATUS_FAILED="FAILED"
 STATUS_OK="OK"
 
+# переменные хранения свойств светодиода
 ledColor="" #${A_COLOR_LED[0]}
 ledState="" #${A_STATE_LED[0]}
 ledRate=""  #${A_RATE_LED[0]}
@@ -20,7 +26,7 @@ keypress=0
 ansverServer1=""
 ansverServer2=""
 
-# функция проверки сервера
+# функция проверки канала сервера сервера
 function Testserver 
 {
     if [ -p $SERVER_PIPE_IN ]
@@ -36,7 +42,7 @@ function Testserver
 fi
 }
 
-
+# функция обмена с сервером
 function ExchangeServer
 {
     ansverServer1=""
@@ -56,8 +62,7 @@ function ExchangeServer
     return 0
 }
 
-# -----------------------------
-
+# функция получения статуса
 function ComGetLedState
 {
     ExchangeServer "get-led-state"
@@ -68,6 +73,7 @@ function ComGetLedState
     fi
 }
 
+# функция установки статуса
 function ComSetLedState
 {
     if [ $# -eq 0 ] || [ $# -gt 1 ]
@@ -88,7 +94,7 @@ function ComSetLedState
     fi
 }
 
-# --------------------------------------
+# функция получения цвета
 function ComGetLedColor
 {
     ExchangeServer "get-led-color"
@@ -99,6 +105,7 @@ function ComGetLedColor
     fi
 }
 
+# функция установки цвета
 function ComSetLedColor
 {
     if [ $# -eq 0 ] || [ $# -gt 1 ]
@@ -119,8 +126,7 @@ function ComSetLedColor
     fi
 }
 
-#----------------------------------------
-
+# функция получения частоты
 function ComGetLedRate
 {
     ExchangeServer "get-led-rate"
@@ -131,6 +137,7 @@ function ComGetLedRate
     fi
 }
 
+# функция установки частоты
 function ComSetLedRate
 {
     if [ $# -eq 0 ] || [ $# -gt 1 ]
@@ -151,7 +158,7 @@ function ComSetLedRate
     fi
 }
 
-# -----------------------------------
+# обновление данных с сервера
 function UpdateData
 {
     ComGetLedState
@@ -160,7 +167,7 @@ function UpdateData
     
 }
 
-
+# функция меню вкл/выкл 
 function LedOnOff
 {
     #ComGetLedState
@@ -173,7 +180,7 @@ function LedOnOff
       
 }
 
-
+# функция меню установки цвета 
 function LedColor
 {
     ComGetLedColor
@@ -215,7 +222,7 @@ function LedColor
     
 }
 
-
+# функция меню установки частоты
 function LedRate
 {
     ComGetLedRate
@@ -260,7 +267,6 @@ function LedRate
 
 
 #************************#
-# Menu                   #
 # Функция основного меню #
 #************************#
 function Menu 
@@ -290,7 +296,6 @@ function Menu
 	return
     fi
 
-    
     case "$keypress" in
     1)
 	UpdateData
@@ -315,9 +320,9 @@ function Menu
 }
 
 
-#*************************#
-# основной цикл программы #
-#*************************#
+#************************#
+# главный цикл программы #
+#************************#
 
 # проверим наличие сервера
 Testserver

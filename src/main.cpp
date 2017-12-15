@@ -3,7 +3,7 @@
  * Сервера управления светодиодом
  */
 
-#include <stdlib.h>
+#include <cstdlib>
 
 // подключаем класс сервера
 #include "ledserver.h"

@@ -1,5 +1,0 @@
-#!/bin/bash
-
-nohup ../bin/LedServer >/dev/null&
-
-exit 0
