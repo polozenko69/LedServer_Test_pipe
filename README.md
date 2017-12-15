@@ -24,7 +24,7 @@
 
 В каталоге проекта выполнить:  
 
-*make*
+*make*  
 *sudo make install*
 
 
